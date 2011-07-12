@@ -1,4 +1,5 @@
-import urllib2, sgmllib, sys
+import urllib2, sgmllib, sys, urlparse
+from urlparse import urlparse
 
 class MyParser(sgmllib.SGMLParser):
 	"A simple parser class."
@@ -12,6 +13,7 @@ class MyParser(sgmllib.SGMLParser):
 		"Init an object, passing 'verbose' to the superclass."
 		sgmllib.SGMLParser.__init__(self, verbose)
 		self.hyperlinks = []
+		self.paths = []
 		self.paras = []
 		self.inside_p = 0
 
@@ -19,7 +21,11 @@ class MyParser(sgmllib.SGMLParser):
 		"Process a hyperlink and its 'attributes'."
 		for name, value in attributes:
 			if name == "href":
-				self.hyperlinks.append(value)
+				url = urlparse(value)
+				if(url.path):
+					self.paths.append(url.path)
+				if(url.scheme and url.scheme == "http"):
+					self.hyperlinks.append(value)
 
 	def start_p(self, attributes):
 		self.inside_p = 1
@@ -38,22 +44,26 @@ class MyParser(sgmllib.SGMLParser):
 	def get_paras(self):
 		return self.paras
 
+	def get_paths(self):
+		return self.paths
+
 	def p_is_relevant(self,p):
 		return len(p) > 100
 
 
 
-response = urllib2.urlopen(sys.argv[1])
-html = response.read()
+def crawl(link):
+	try:
+		parser = MyParser()
 
-myparser = MyParser()
-myparser.parse(html)
+		h = urllib2.urlopen(link).read()	
+		parser.parse(h)
 
-links = myparser.get_hyperlinks()
-paras = myparser.get_paras()
+		parser.get_hyperlinks().reverse()
+		for l in parser.get_hyperlinks():
+			print l
+			crawl(l)
+	except:
+		print "=== ERROR GETTING " + link + " ==="
 
-for link in links:
-	print link
-
-for para in paras:
-	print para
+crawl(sys.argv[1])
